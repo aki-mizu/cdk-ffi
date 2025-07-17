@@ -603,4 +603,53 @@ impl FFIWallet {
             Ok(result.into())
         })
     }
+
+    /// Send cashu tokens directly (not Lightning)
+    /// Returns a cashu token that can be shared with others
+    pub fn send_cashu_token(
+        &self,
+        amount: FFIAmount,
+        memo: Option<String>,
+    ) -> Result<FFIToken> {
+        self.runtime.block_on(async {
+            // Create send options for cashu token
+            let send_options = cdk::wallet::SendOptions {
+                memo: memo.map(|m| cdk::wallet::SendMemo {
+                    memo: m,
+                    include_memo: true,
+                }),
+                conditions: None,
+                amount_split_target: cdk::amount::SplitTarget::default(),
+                send_kind: cdk_common::wallet::SendKind::OnlineExact,
+                include_fee: false,
+                metadata: std::collections::HashMap::new(),
+                max_proofs: None,
+            };
+
+            // Prepare the send
+            let prepared = self
+                .inner
+                .prepare_send(amount.into(), send_options)
+                .await?;
+            
+            // Send and get the token
+            let token = self.inner.send(prepared, None).await?;
+            Ok(token.try_into()?)
+        })
+    }
+
+    /// Receive and redeem a cashu token
+    /// Returns the amount that was redeemed
+    pub fn receive_cashu_token(&self, token_string: String) -> Result<FFIAmount> {
+        self.runtime.block_on(async {
+            // Use the wallet's receive method which handles token parsing internally
+            let receive_options = cdk::wallet::ReceiveOptions::default();
+            let received_amount = self.inner.receive(&token_string, receive_options).await
+                .map_err(|e| FFIError::WalletError {
+                    msg: format!("Failed to receive token: {}", e),
+                })?;
+
+            Ok(received_amount.into())
+        })
+    }
 } 
