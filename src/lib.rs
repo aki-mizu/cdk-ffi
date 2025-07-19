@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use cdk::amount::SplitTarget;
@@ -635,6 +636,21 @@ impl FFIWallet {
             // Send and get the token
             let token = self.inner.send(prepared, None).await?;
             Ok(token.try_into()?)
+        })
+    }
+
+    /// Parse a cashu token to extract mint information without redeeming it
+    /// Returns token metadata including mint URL, memo, and unit
+    pub fn parse_cashu_token(&self, token_string: String) -> Result<FFIToken> {
+        self.runtime.block_on(async {
+            // Parse the token string to extract mint information
+            let token = cdk::nuts::Token::from_str(&token_string)
+                .map_err(|e| FFIError::InvalidInput {
+                    msg: format!("Failed to parse token: {}", e),
+                })?;
+
+            // Convert to FFI token structure
+            token.try_into()
         })
     }
 
